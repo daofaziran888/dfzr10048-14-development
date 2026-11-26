@@ -59,3 +59,35 @@ export async function loadOverview(): Promise<OverviewResult> {
   if (!response.ok) throw new Error('运营概览读取失败')
   return await response.json()
 }
+
+export type RevisionPayload = Record<string, unknown>
+
+export async function previewCorrectionBatch(payload: RevisionPayload): Promise<any> {
+  const response = await request('/api/correction_loop/batch-preview', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return await response.json()
+}
+
+export async function acceptCorrectionBatch(payload: RevisionPayload): Promise<any> {
+  const response = await request('/api/correction_loop/batch-accept', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return await response.json()
+}
+
+export async function loadCorrectionScenario(reset = false): Promise<any> {
+  const response = await request('/api/correction_loop/scenario/load', {
+    method: 'POST',
+    body: JSON.stringify({ reset }),
+  })
+  return await response.json()
+}
+
+export async function getVersionRanges(versionRef: string): Promise<any> {
+  const response = await request(`/api/transcript_version/${encodeURIComponent(versionRef)}/ranges`)
+  if (!response.ok) throw new Error('版本修订范围查回失败')
+  return await response.json()
+}

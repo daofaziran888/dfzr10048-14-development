@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.base import BaseModuleService
+from app.services.revision_ledger import revision_ledger
 from app.store import store
 
 
@@ -69,3 +70,19 @@ class TranscriptVersionService(BaseModuleService):
         vers = [r for r in rows if r.get("关联任务") == task_id]
         vers.sort(key=lambda r: r.get("版本号", "v0"))
         return vers
+
+    def get_revision_ranges(self, version_ref: str) -> dict[str, Any]:
+        """按版本查回不可变原文，以及已采用/待处理的原文坐标范围。"""
+        return revision_ledger.revision_ranges(version_ref)
+
+    def get_revision_details(self, version_ref: str) -> list[dict[str, Any]]:
+        return revision_ledger.revision_ranges(version_ref).get("revision_details", [])
+
+    def get_adopted_and_pending_ranges(self, version_ref: str) -> dict[str, Any]:
+        result = revision_ledger.revision_ranges(version_ref)
+        return {
+            "adopted": result["adopted_ranges"],
+            "pending": result["pending_ranges"],
+            "已采用范围": result["adopted_ranges"],
+            "待处理范围": result["pending_ranges"],
+        }

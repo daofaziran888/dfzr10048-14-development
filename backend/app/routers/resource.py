@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from app.schemas import ActionPayload, ActionResult, EntryPayload, PageResult
 from app.services import service_for
+from app.store import store
 
 router = APIRouter(prefix="/api", tags=["业务资源"])
 
@@ -73,12 +74,34 @@ def export_entries(
     )
 
 
-@router.get("/{module}/{entry_id}", response_model=dict)
-def get_entry(module: str, entry_id: int) -> dict[str, Any]:
+@router.get("/{module}/{entry_ref}", response_model=dict)
+def get_entry(module: str, entry_ref: str) -> dict[str, Any]:
     service = require_service(module)
-    entry = service.get_entry(entry_id)
+    entry = None
+    if entry_ref.isdigit():
+        entry = service.get_entry(int(entry_ref))
     if entry is None:
-        raise HTTPException(status_code=404, detail=f"{service.ENTITY} {entry_id} 不存在或已归档")
+        business_field = service.LIST_FIELDS[0] if service.LIST_FIELDS else ""
+        for row in store.rows(module):
+            if str(row.get(business_field)) == entry_ref or any(
+                str(value) == entry_ref for value in row.values()
+            ):
+                entry = row
+                break
+    if entry is None and module == "transcript_version":
+        from app.services.revision_ledger import revision_ledger
+        entry = revision_ledger.resolve_version_row(entry_ref)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"{service.ENTITY} {entry_ref} 不存在或已归档")
+    if module == "transcript_version":
+        from app.services.revision_ledger import revision_ledger
+        ref = str(entry.get("版本编号") or entry.get("版本号") or entry_ref)
+        ranges = revision_ledger.revision_ranges(ref)
+        if (not ranges.get("original_text")) and entry_ref != ref:
+            alias_ranges = revision_ledger.revision_ranges(entry_ref)
+            if alias_ranges.get("original_text"):
+                ranges = alias_ranges
+        entry = {**entry, **ranges}
     return entry
 
 
@@ -88,7 +111,9 @@ def create_entry(module: str, payload: EntryPayload) -> ActionResult:
     entry, missing = service.create_entry(payload.values)
     if missing:
         return ActionResult(ok=False, message=f"缺少必填字段：{'、'.join(missing)}")
-    return ActionResult(ok=True, message=f"{service.ENTITY}已登记", entry=entry)
+    duplicate_message = entry.pop("_message", None) if entry is not None else None
+    message = duplicate_message or f"{service.ENTITY}已登记"
+    return ActionResult(ok=True, message=message, entry=entry)
 
 
 @router.post("/{module}/{entry_id}/actions", response_model=ActionResult)

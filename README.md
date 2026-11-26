@@ -73,6 +73,31 @@ npm run dev
 | 归档架位 | `archive_shelf` | 归档条目 | 归档编号、关联媒体源、架位标识 |
 | 采集审计 | `media_audit` | 审计条目 | 审计编号、关联对象、操作类型 |
 
+## 纠错批量预览与坐标修订
+
+在「纠错回路」列表可勾选同一关联版本/底稿下的多笔纠错单，点击
+「多选预览并批量受理」。弹窗会展示：
+
+- 提交前原文/产出文本对照；
+- 每个产出片段对应的 V1 原坐标 `[start,end)` 与纠错单来源；
+- 服务端按原文坐标生成的版本修订明细；
+- 同起点/区间重叠提示，以及应返回继续处理的句子；
+- 可受理的独立更正与被重叠阻断的更正。
+
+主要接口：
+
+```text
+POST /api/correction_loop/batch-preview
+POST /api/correction_loop/batch-accept
+GET  /api/transcript_version/{V1|版本编号|版本号}/ranges
+```
+
+批量受理支持 `idempotency_key`；相同键重放或同一纠错单重复受理不会重复
+写入插入。转写版本的 `original_text` 保持不可变，`adopted_ranges` 与
+`pending_ranges` 可从版本接口查回。需要快速演练题设时，在纠错回路页点击
+「载入「海风吹过港口」交会场景」，或调用
+`POST /api/correction_loop/scenario/load`。
+
 ## 约定
 
 - 全部模块共享`frontend/src/views/WorkbenchView.vue|tsx`和一套资源路由。
